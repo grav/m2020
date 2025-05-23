@@ -48,6 +48,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final Set<String> _wonTimes = {};
   String _currentUsername = '';
   bool _isUsernameSet = false;
+  DateTime _timeOffset = DateTime.now();
+  bool _showTimeControls = false;
 
   final List<String> _mirrorTimes = [
     '00:00', '01:01', '02:02', '03:03', '04:04', '05:05',
@@ -69,8 +71,12 @@ class _ChatScreenState extends State<ChatScreen> {
     return _mirrorTimes.contains(text.trim());
   }
 
+  DateTime _getCurrentTime() {
+    return _timeOffset;
+  }
+
   bool _isTimeClose(String mirrorTime) {
-    final now = DateTime.now();
+    final now = _getCurrentTime();
     final parts = mirrorTime.split(':');
     final hour = int.parse(parts[0]);
     final minute = int.parse(parts[1]);
@@ -81,11 +87,23 @@ class _ChatScreenState extends State<ChatScreen> {
     return difference.inMinutes <= 1;
   }
 
+  void _adjustTime(int minutes) {
+    setState(() {
+      _timeOffset = _timeOffset.add(Duration(minutes: minutes));
+    });
+  }
+
+  void _resetTime() {
+    setState(() {
+      _timeOffset = DateTime.now();
+    });
+  }
+
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    final now = DateTime.now();
+    final now = _getCurrentTime();
     bool isWinner = false;
 
     if (_isMirrorTime(text) && _isTimeClose(text) && !_wonTimes.contains(text)) {
@@ -158,11 +176,19 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text('Mirror Time Chat - $_currentUsername'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: Icon(_showTimeControls ? Icons.schedule : Icons.access_time),
+            onPressed: () {
+              setState(() {
+                _showTimeControls = !_showTimeControls;
+              });
+            },
+          ),
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Center(
               child: Text(
-                _formatTime(DateTime.now()),
+                _formatTime(_getCurrentTime()),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
@@ -171,6 +197,36 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          if (_showTimeControls)
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              color: Colors.grey.shade100,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => _adjustTime(-10),
+                    child: const Text('-10m'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _adjustTime(-1),
+                    child: const Text('-1m'),
+                  ),
+                  ElevatedButton(
+                    onPressed: _resetTime,
+                    child: const Text('Reset'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _adjustTime(1),
+                    child: const Text('+1m'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _adjustTime(10),
+                    child: const Text('+10m'),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: ListView.builder(
               itemCount: _messages.length,
