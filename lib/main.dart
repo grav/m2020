@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'supabase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.initialize();
   runApp(const MirrorTimeChatApp());
 }
 
@@ -50,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isUsernameSet = false;
   DateTime _timeOffset = DateTime.now();
   bool _showTimeControls = false;
+  bool _isLoading = false;
 
   final List<String> _mirrorTimes = [
     '00:00', '01:01', '02:02', '03:03', '04:04', '05:05',
@@ -57,6 +61,43 @@ class _ChatScreenState extends State<ChatScreen> {
     '12:12', '13:13', '14:14', '15:15', '16:16', '17:17',
     '18:18', '19:19', '20:20', '21:21', '22:22', '23:23'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  void _loadInitialData() async {
+    setState(() => _isLoading = true);
+    try {
+      final wonTimes = await SupabaseService.getWonTimes();
+      setState(() {
+        _wonTimes.addAll(wonTimes);
+      });
+      _subscribeToMessages();
+    } catch (e) {
+      print('Error loading initial data: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _subscribeToMessages() {
+    SupabaseService.messagesStream().listen((data) {
+      final messages = data.map((row) => ChatMessage(
+        username: row['username'],
+        message: row['message'],
+        timestamp: DateTime.parse(row['timestamp']),
+        isWinner: row['is_winner'] ?? false,
+      )).toList();
+      
+      setState(() {
+        _messages.clear();
+        _messages.addAll(messages);
+      });
+    });
+  }
 
   void _setUsername() {
     if (_usernameController.text.trim().isNotEmpty) {
@@ -99,29 +140,36 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
     final now = _getCurrentTime();
     bool isWinner = false;
+    String mirrorTime = '';
 
-    if (_isMirrorTime(text) && _isTimeClose(text) && !_wonTimes.contains(text)) {
-      isWinner = true;
-      _wonTimes.add(text);
+    if (_isMirrorTime(text) && _isTimeClose(text)) {
+      mirrorTime = text;
+      isWinner = await SupabaseService.checkAndSetWinner(text, _currentUsername);
+      if (isWinner) {
+        setState(() {
+          _wonTimes.add(text);
+        });
+      }
     }
 
-    final message = ChatMessage(
-      username: _currentUsername,
-      message: text,
-      timestamp: now,
-      isWinner: isWinner,
-    );
-
-    setState(() {
-      _messages.add(message);
+    try {
+      await SupabaseService.sendMessage(
+        username: _currentUsername,
+        message: text,
+        timestamp: now,
+        isWinner: isWinner,
+        mirrorTime: mirrorTime,
+      );
       _messageController.clear();
-    });
+    } catch (e) {
+      print('Error sending message: $e');
+    }
   }
 
   String _formatTime(DateTime time) {
