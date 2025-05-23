@@ -3,11 +3,7 @@ import 'supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await SupabaseService.initialize();
-  } catch (e) {
-    print('Supabase initialization error: $e');
-  }
+  await SupabaseService.initialize();
   runApp(const MirrorTimeChatApp());
 }
 
