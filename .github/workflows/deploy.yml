@@ -28,8 +28,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
         
+      - name: List web directory
+        run: ls -la web/
+        
       - name: Build web
         run: flutter build web --release
+        
+      - name: List build output
+        run: ls -la build/web/
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
